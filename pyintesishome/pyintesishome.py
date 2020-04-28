@@ -7,8 +7,13 @@ import sys
 import aiohttp
 
 _LOGGER = logging.getLogger("pyintesishome")
+_LOGGER.setLevel(logging.DEBUG)
+handler = logging.StreamHandler(sys.stdout)
+handler.setLevel(logging.DEBUG)
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+handler.setFormatter(formatter)
+_LOGGER.addHandler(handler)
 
-INTESIS_CMD_STATUS = '{"status":{"hash":"x"},"config":{"hash":"x"}}'
 INTESIS_NULL = 32768
 
 DEVICE_INTESISHOME = "IntesisHome"
@@ -19,248 +24,17 @@ API_CONNECTING = "Connecting"
 API_AUTHENTICATED = "Connected"
 API_AUTH_FAILED = "Wrong username/password"
 
-MODE_BITS = {1: "auto", 2: "heat", 4: "dry", 8: "fan", 16: "cool"}
-
-INTESIS_MAP = {
-    1: {"name": "power", "values": {0: "off", 1: "on"}},
-    2: {
-        "name": "mode",
-        "values": {0: "auto", 1: "heat", 2: "dry", 3: "fan", 4: "cool"},
-    },
-    4: {"name": "fan_speed"},
-    5: {
-        "name": "vvane",
-        "values": {
-            0: "auto/stop",
-            1: "manual1",
-            2: "manual2",
-            3: "manual3",
-            4: "manual4",
-            5: "manual5",
-            6: "manual6",
-            7: "manual7",
-            8: "manual8",
-            9: "manual9",
-            10: "swing",
-        },
-    },
-    6: {
-        "name": "hvane",
-        "values": {
-            0: "auto/stop",
-            10: "swing",
-            1: "manual1",
-            2: "manual2",
-            3: "manual3",
-            4: "manual4",
-            5: "manual5",
-        },
-    },
-    9: {"name": "setpoint"},
-    10: {"name": "temperature"},
-    12: {"name": "remote_controller_lock"},
-    13: {"name": "working_hours"},
-    14: {"name": "alarm_status"},
-    15: {"name": "error_code"},
-    34: {"name": "quiet_mode", "values": {0: "off", 1: "on"}},
-    35: {"name": "setpoint_min"},
-    36: {"name": "setpoint_max"},
-    37: {"name": "outdoor_temp"},
-    38: {"name": "water_outlet_temperature"},
-    39: {"name": "water_inlet_temperature"},
-    42: {
-        "name": "climate_working_mode",
-        "values": {0: "comfort", 1: "eco", 2: "powerful"},
-    },
-    44: {
-        "name": "tank_working_mode",
-        "values": {0: "comfort", 1: "eco", 2: "powerful"},
-    },
-    45: {"name": "tank_water_temperature"},
-    46: {"name": "solar_status"},
-    48: {"name": "thermoshift_heat_eco"},
-    49: {"name": "thermoshift_cool_eco"},
-    51: {"name": "thermoshift_cool_powerful"},
-    52: {"name": "thermoshift_tank_eco"},
-    53: {"name": "thermoshift_tank_powerful"},
-    54: {"name": "error_reset"},
-    55: {"name": "heat_thermo_shift"},
-    56: {"name": "cool_water_setpoint_temperature"},
-    57: {"name": "tank_setpoint_temperature"},
-    58: {
-        "name": "operating_mode",
-        "values": {
-            0: "maintenance",
-            1: "heat",
-            2: "heat+tank",
-            3: "tank",
-            4: "cool+tank",
-            5: "cool",
-            6: "auto",
-            7: "auto+tank",
-        },
-    },
-    60: {"name": "heat_8_10"},
-    61: {"name": "config_mode_map"},
-    62: {"name": "runtime_mode_restrictions"},
-    63: {"name": "config_horizontal_vanes"},
-    64: {"name": "config_vertical_vanes"},
-    65: {"name": "config_quiet"},
-    66: {"name": "config_confirm_off"},
-    67: {
-        "name": "config_fan_map",
-        "values": {
-            6: {1: "low", 2: "high"},
-            7: {0: "auto", 1: "low", 2: "high"},
-            14: {1: "low", 2: "medium", 3: "high"},
-            15: {0: "auto", 1: "low", 2: "medium", 3: "high"},
-            30: {1: "quiet", 2: "low", 3: "medium", 4: "high"},
-            31: {0: "auto", 1: "quiet", 2: "low", 3: "medium", 4: "high"},
-            62: {1: "quiet", 2: "low", 3: "medium", 4: "high", 5: "max"},
-            63: {0: "auto", 1: "quiet", 2: "low", 3: "medium", 4: "high", 5: "max"},
-        },
-    },
-    68: {"name": "instant_power_consumption"},
-    69: {"name": "accumulated_power_consumption"},
-    75: {
-        "name": "config_operating_mode",
-        "values": {
-            49: {1: "heat", 5: "cool", 6: "auto"},
-            127: {
-                1: "heat",
-                2: "heat+tank",
-                3: "tank",
-                4: "cool+tank",
-                5: "cool",
-                6: "auto",
-                7: "auto+tank",
-            },
-        },
-    },
-    77: {"name": "config_vanes_pulse"},
-    80: {"name": "aquarea_tank_consumption"},
-    81: {"name": "aquarea_cool_consumption"},
-    82: {"name": "aquarea_heat_consumption"},
-    83: {"name": "heat_high_water_set_temperature"},
-    84: {"name": "heating_off_temperature"},
-    87: {"name": "heater_setpoint_temperature"},
-    90: {"name": "water_target_temperature"},
-    95: {
-        "name": "heat_interval",
-        "values": {
-            1: 30,
-            2: 60,
-            3: 90,
-            4: 120,
-            5: 150,
-            6: 180,
-            7: 210,
-            8: 240,
-            9: 270,
-            10: 300,
-            11: 330,
-            12: 360,
-            13: 390,
-            14: 420,
-            15: 450,
-            16: 480,
-            17: 510,
-            18: 540,
-            19: 570,
-            20: 600,
-        },
-    },
-    107: {"name": "aquarea_working_hours"},
-    123: {"name": "ext_thermo_control", "values": {85: "off", 170: "on"}},
-    124: {"name": "tank_present", "values": {85: "off", 170: "on"}},
-    125: {"name": "solar_priority", "values": {85: "off", 170: "on"}},
-    134: {"name": "heat_low_outdoor_set_temperature"},
-    135: {"name": "heat_high_outdoor_set_temperature"},
-    136: {"name": "heat_low_water_set_temperature"},
-    137: {"name": "farenheit_type"},
-    140: {"name": "extremes_protection_status"},
-    144: {"name": "error_code"},
-    148: {"name": "extremes_protection"},
-    149: {"name": "binary_input"},
-    153: {"name": "config_binary_input"},
-    168: {"name": "uid_binary_input_on_off"},
-    169: {"name": "uid_binary_input_occupancy"},
-    170: {"name": "uid_binary_input_window"},
-    181: {"name": "mainenance_w_reset"},
-    182: {"name": "mainenance_wo_reset"},
-    183: {"name": "filter_clean"},
-    184: {"name": "filter_due_hours"},
-    185: {"name": "uid_185"},
-    186: {"name": "uid_186"},
-    191: {"name": "uid_binary_input_sleep_mode"},
-    50000: {
-        "name": "external_led",
-        "values": {0: "off", 1: "on", 2: "blinking only on change"},
-    },
-    50001: {"name": "internal_led", "values": {0: "off", 1: "on"}},
-    50002: {"name": "internal_temperature_offset"},
-    50003: {"name": "temp_limitation", "values": {0: "off", 2: "on"}},
-    50004: {"name": "cool_temperature_min"},
-    50005: {"name": "cool_temperature_max"},
-    50006: {"name": "heat_temperature_min"},
-    50007: {"name": "heat_temperature_min"},
-    60002: {"name": "rssi"},
-}
-
-COMMAND_MAP = {
-    "power": {"uid": 1, "values": {"off": 0, "on": 1}},
-    "mode": {"uid": 2, "values": {"auto": 0, "heat": 1, "dry": 2, "fan": 3, "cool": 4}},
-    "operating_mode": {
-        "uid": 58,
-        "values": {
-            "heat": 1,
-            "heat+tank": 2,
-            "tank": 3,
-            "cool+tank": 4,
-            "cool": 5,
-            "auto": 6,
-            "auto+tank": 7,
-        },
-    },
-    "climate_working_mode": {
-        "uid": 42,
-        "values": {"comfort": 0, "eco": 1, "powerful": 2},
-    },
-    "fan_speed": {"uid": 4},
-    "vvane": {
-        "uid": 5,
-        "values": {
-            "auto/stop": 0,
-            "swing": 10,
-            "manual1": 1,
-            "manual2": 2,
-            "manual3": 3,
-            "manual4": 4,
-            "manual5": 5,
-        },
-    },
-    "hvane": {
-        "uid": 6,
-        "values": {
-            "auto/stop": 0,
-            "swing": 10,
-            "manual1": 1,
-            "manual2": 2,
-            "manual3": 3,
-            "manual4": 4,
-            "manual5": 5,
-        },
-    },
-    "setpoint": {"uid": 9},
-}
-
-API_URL = {
-    DEVICE_AIRCONWITHME: "https://user.airconwithme.com/api.php/get/control",
-    DEVICE_INTESISHOME: "https://user.intesishome.com/api.php/get/control",
-}
-
-API_VER = {DEVICE_AIRCONWITHME: "1.6.2", DEVICE_INTESISHOME: "1.8.5"}
-
+PARAM_POWER = "onOff"
+PARAM_POWER_CONSUMPTION = "instantPowerConsumption"
+PARAM_ACC_POWER_CONSUMPTION = "accumulatedPowerConsumption"
+PARAM_MODE = "userMode"
+PARAM_FAN_SPEED = "fanSpeed"
+PARAM_SETPOINT = "userSetpoint"
+PARAM_SETPOINT_MAX = "maxTemperatureSetpoint"
+PARAM_SETPOINT_MIN = "minTemperatureSetpoint"
+PARAM_WORKING_HOURS = "onTime"
+PARAM_OUTDOOR_TEMP = "outdoorTemperature"
+PARAM_TEMPERATURE = "returnPathTemperature"
 
 class IHConnectionError(Exception):
     pass
@@ -269,6 +43,24 @@ class IHConnectionError(Exception):
 class IHAuthenticationError(ConnectionError):
     pass
 
+class IHDataError(Exception):
+    pass
+
+# This function takes a single proto-tag---the string in between the commas
+# that will be turned into a valid tag---and sanitizes it.  It either
+# returns an alphanumeric string (if the argument can be made into a valid
+# tag) or None (if the argument cannot be made into a valid tag; i.e., if
+# the argument contains only whitespace and/or punctuation).
+def sanitizeTag(str):
+    str = ''.join(c if c.isalnum() else ' ' for c in str)
+    words = str.split()
+    numWords = len(words)
+    if numWords == 0:
+        return None
+    elif numWords == 1:
+        return words[0]
+    else:
+        return words[0].lower() + ''.join(w.capitalize() for w in words[1:])
 
 class IntesisHome:
     def __init__(
@@ -278,11 +70,12 @@ class IntesisHome:
         loop=None,
         websession=None,
         device_type=DEVICE_INTESISHOME,
+        ip="",
     ):
         # Select correct API for device type
         self._device_type = device_type
-        self._api_url = API_URL[device_type]
-        self._api_ver = API_VER[device_type]
+        self._api_url = 'http://' + ip + '/api.cgi'
+        self._ip = ip
         self._username = username
         self._password = password
         self._cmdServer = None
@@ -298,8 +91,6 @@ class IntesisHome:
         self._errorMessage = None
         self._webSession = websession
         self._ownSession = False
-        self._reader = None
-        self._writer = None
         self._reconnectionAttempt = 0
 
         if loop:
@@ -316,39 +107,12 @@ class IntesisHome:
 
     async def _handle_packets(self):
         while True:
+            await asyncio.sleep(5)
             try:
-                data = await self._reader.readuntil(b"}}")
-                if not data:
-                    break
-
-                message = data.decode("ascii")
-                _LOGGER.debug(f"{self._device_type} API Received: {message}")
-                resp = json.loads(message)
-                # Parse response
-                if resp["command"] == "connect_rsp":
-                    # New connection success
-                    if resp["data"]["status"] == "ok":
-                        _LOGGER.info(f"{self._device_type} succesfully authenticated")
-                        self._connected = True
-                        self._connecting = False
-                        self._connectionRetires = 0
-                        await self._send_update_callback()
-                elif resp["command"] == "status":
-                    # Value has changed
-                    self._update_device_state(
-                        resp["data"]["deviceId"],
-                        resp["data"]["uid"],
-                        resp["data"]["value"],
-                    )
-                    self._update_rssi(resp["data"]["deviceId"], resp["data"]["rssi"])
-                    if resp["data"]["uid"] != 60002:
-                        await self._send_update_callback(
-                            deviceId=str(resp["data"]["deviceId"])
-                        )
-                elif resp["command"] == "rssi":
-                    # Wireless strength has changed
-                    self._update_rssi(resp["data"]["deviceId"], resp["data"]["value"])
-            except asyncio.IncompleteReadError:
+                #await self.poll_status()
+                for devId, dev in self._devices.items():
+                    await self._query_state(devId)
+            except IHConnectionError:
                 _LOGGER.error(
                     f"pyIntesisHome lost connection to the {self._device_type} server."
                 )
@@ -356,8 +120,6 @@ class IntesisHome:
                 self._connected = False
                 self._connecting = False
                 self._authToken = None
-                self._reader._transport.close()
-                self._writer._transport.close()
                 self._sendQueueTask.cancel()
                 await self._send_update_callback()
                 return
@@ -366,12 +128,78 @@ class IntesisHome:
         while self._connected or self._connecting:
             data = await self._sendQueue.get()
             try:
-                self._writer.write(data.encode("ascii"))
-                await self._writer.drain()
-                _LOGGER.debug(f"Sent command {data}")
+                toSend = {
+                    "command": "setdatapointvalue",
+                    "data":
+                    {
+                        "sessionID": self._authToken,
+                        "uid": int(data.get("uid")),
+                        "value": int(data.get("value"))
+                    }
+                }
+
+                await self._process_query(toSend)
+                _LOGGER.debug(f"Sending command {data}")
             except Exception as e:
                 _LOGGER.error(f"Exception: {repr(e)}")
                 return
+
+    async def _process_query(self, request_json):
+        status_response = None
+        try:
+            async with self._webSession.post(
+                url=self._api_url, json=request_json
+            ) as resp:
+                status_response = await resp.json(content_type="application/json")
+                _LOGGER.debug(status_response)
+        except (aiohttp.client_exceptions.ClientError) as e:
+            self._errorMessage = f"Error connecting to {self._device_type} API: {e}"
+            _LOGGER.error(f"{type(e)} Exception. {repr(e.args)} / {e}")
+            raise IHConnectionError
+        except (aiohttp.client_exceptions.ClientConnectorError) as e:
+            raise IHConnectionError
+
+        if status_response.get("success") == False:
+            self._errorMessage = status_response.get("error").get("message")
+            _LOGGER.error(f"Error from API {repr(self._errorMessage)}")
+            raise IHAuthenticationError()
+        return status_response.get("data")
+
+    def _get_param_value(self, deviceId, name):
+        val = self._devices[str(deviceId)].get(name)
+        _LOGGER.debug(name)
+        _LOGGER.debug(val)
+        
+        for attr, value in self._devices[deviceId]["dataMap"].items():
+            if value.get("id") == name:
+                if "values" in value:
+                    val = value.get("values").get(str(val))
+                return val
+
+    def _get_param_value_id(self, obj, value):
+        if "values" in obj:
+            for attr, item in obj.get("values").items():
+                if value == item:
+                    return attr
+            _LOGGER.error('Unknown value ' + value)
+            raise IHDataError
+        else:
+            return value
+
+    def _has_feature(self, deviceId, name):
+        for attr, value in self._devices[deviceId]["dataMap"].items(): #TODO: per device
+            if value.get("id") == name:
+                return True
+        return False
+
+    def _get_param_options(self, deviceId, name):
+        for attr, value in self._devices[deviceId]["dataMap"].items():
+            if value.get("id") == name:
+                res_list = list()
+                for keyItem, valItem in value.get("values").items():
+                    res_list.append(valItem)
+                return res_list
+        return None
 
     async def connect(self):
         """Public method for connecting to IntesisHome/Airconwithme API"""
@@ -390,28 +218,12 @@ class IntesisHome:
                 self._connectionRetires += 1
 
             _LOGGER.debug(
-                "Opening connection to %s API at %s:%i",
+                "Connected to %s at %s",
                 self._device_type,
-                self._cmdServer,
-                self._cmdServerPort,
+                self._ip,
             )
 
             try:
-                # Create asyncio socket
-                self._reader, self._writer = await asyncio.open_connection(
-                    self._cmdServer, self._cmdServerPort
-                )
-
-                # Authenticate
-                authMsg = '{"command":"connect_req","data":{"token":%s}}' % (
-                    self._authToken
-                )
-                # Clear the OTP
-                self._authToken = None
-                self._writer.write(authMsg.encode("ascii"))
-                await self._writer.drain()
-                _LOGGER.debug("Data sent: %s", authMsg)
-
                 self._eventLoop.create_task(self._handle_packets())
                 self._sendQueueTask = self._eventLoop.create_task(self._send_queue())
             except Exception as e:
@@ -423,11 +235,6 @@ class IntesisHome:
     async def stop(self):
         """Public method for shutting down connectivity with the envisalink."""
         self._connected = False
-        if self._writer._transport:
-            self._writer._transport.close()
-
-        if self._reader._transport:
-            self._reader._transport.close()
 
         if self._ownSession:
             await self._webSession.close()
@@ -445,332 +252,339 @@ class IntesisHome:
 
     async def poll_status(self, sendcallback=False):
         """Public method to query IntesisHome for state of device. Notifies subscribers if sendCallback True."""
-        get_status = {
-            "username": self._username,
-            "password": self._password,
-            "cmd": INTESIS_CMD_STATUS,
-            "version": self._api_ver,
+        get_token = {
+            "command": "login",
+            "data": {
+                "username": self._username,
+                "password": self._password,
+            }
         }
 
-        status_response = None
-        try:
-            async with self._webSession.post(
-                url=self._api_url, data=get_status
-            ) as resp:
-                status_response = await resp.json(content_type=None)
-                _LOGGER.debug(status_response)
-        except (aiohttp.client_exceptions.ClientError) as e:
-            self._errorMessage = f"Error connecting to {self._device_type} API: {e}"
-            _LOGGER.error(f"{type(e)} Exception. {repr(e.args)} / {e}")
-            raise IHConnectionError
-        except (aiohttp.client_exceptions.ClientConnectorError) as e:
-            raise IHConnectionError
+        response = await self._process_query(get_token)
+        self._authToken = response.get("id").get("sessionID")
+        _LOGGER.debug(
+            "Token: %s",
+            self._authToken,
+        )
 
-        if status_response:
-            if "errorCode" in status_response:
-                self._errorMessage = status_response["errorMessage"]
-                _LOGGER.error(f"Error from API {repr(self._errorMessage)}")
-                raise IHAuthenticationError()
-                return
+        get_info = {
+            "command": "getinfo",
+            "data": {
+                "sessionID": self._authToken,
+            }
+        }
+        response = await self._process_query(get_info)
+        device = response.get("info")
+        deviceId = device["sn"]
+        
+        #todo id
 
-            config = status_response.get("config")
-            if config:
-                self._cmdServer = config.get("serverIP")
-                self._cmdServerPort = config.get("serverPort")
-                self._authToken = config.get("token")
+        if deviceId in self._devices:
+            self._devices[deviceId]["rssi"] = device["rssi"],
+        else:
+            self._devices[deviceId] = {
+                "name": device["ownSSID"], #TODO
+                "widgets": [42],
+                "model": device["deviceModel"],
+                "rssi": device["rssi"],
+            }
 
-                _LOGGER.debug(
-                    "Server: %s:%i, Token: %s",
-                    self._cmdServer,
-                    self._cmdServerPort,
-                    self._authToken,
-                )
+        if "dataMap" not in self._devices[deviceId]:
+            dp_names_reponse = None
+            try:
+                async with self._webSession.get(
+                    url="http://" + self._ip + "/js/data/data.json",
+                ) as resp:
+                    dp_names_reponse = await resp.json(content_type="application/octet-stream")
+                    #_LOGGER.debug(dp_names_reponse)
+            except (aiohttp.client_exceptions.ClientError) as e:
+                self._errorMessage = f"Error reading {self._device_type} datamap names: {e}"
+                _LOGGER.error(f"{type(e)} Exception. {repr(e.args)} / {e}")
+                raise IHConnectionError
+            except (aiohttp.client_exceptions.ClientConnectorError) as e:
+                raise IHConnectionError
 
-            # Setup devices
-            for installation in config.get("inst"):
-                for device in installation.get("devices"):
-                    self._devices[device["id"]] = {
-                        "name": device["name"],
-                        "widgets": device["widgets"],
-                        "model": device["modelId"],
+            dp_names = dp_names_reponse.get("signals").get("uid")
+            dp_labels = dp_names_reponse.get("signals").get("uidTextvalues")
+            data_map = {}
+            for attr, value in dp_names.items():
+                if isinstance(value[1], str):
+                    data_map[int(attr)] = {
+                        "name": value[0],
+                        "id": sanitizeTag(value[0]),
+                        "values": dp_labels.get(value[1]),
                     }
-                    _LOGGER.debug(repr(self._devices))
-
-            # Update device status
-            for status in status_response["status"]["status"]:
-                deviceId = str(status["deviceId"])
-
-                # Handle devices which don't appear in installation
-                if deviceId not in self._devices:
-                    self._devices[deviceId] = {
-                        "name": "Device " + deviceId,
-                        "widgets": [42],
+                else:
+                    data_map[int(attr)] = {
+                        "name": value[0],
+                        "id": sanitizeTag(value[0]),
                     }
 
-                self._update_device_state(deviceId, status["uid"], status["value"])
+            get_avail_data = {
+                "command": "getavailabledatapoints",
+                "data": {
+                    "sessionID": self._authToken,
+                    "uid": "all"
+                }
+            }
+            response = await self._process_query(get_avail_data)
+            #todo filter
+            self._devices[deviceId]["dataMap"] = data_map
+        
+        await self._query_state(deviceId)
 
-            if sendcallback:
-                await self._send_update_callback(deviceId=str(deviceId))
+        if sendcallback:
+            await self._send_update_callback(deviceId=str(deviceId))
 
         return self._authToken
 
-    def get_run_hours(self, deviceId) -> str:
-        """Public method returns the run hours of the IntesisHome controller."""
-        run_hours = self._devices[str(deviceId)].get("working_hours")
-        return run_hours
+    async def _query_state(self, deviceId):
+        _LOGGER.debug("Refreshing " + deviceId + " state")
+        get_data = {
+            "command": "getdatapointvalue",
+            "data": {
+                "sessionID": self._authToken,
+                "uid": "all"
+            }
+        }
+        response = await self._process_query(get_data)
 
-    async def set_mode(self, deviceId, mode: str):
-        """Internal method for setting the mode with a string value."""
-        mode_control = "mode"
-        if "mode" not in self._devices[str(deviceId)]:
-            mode_control = "operating_mode"
+        for status in response.get("dpval"):
+            self._update_device_state(deviceId, status["uid"], status["value"])
 
-        if mode in COMMAND_MAP[mode_control]["values"]:
-            await self._set_value(
-                deviceId,
-                COMMAND_MAP[mode_control]["uid"],
-                COMMAND_MAP[mode_control]["values"][mode],
-            )
+    async def _set_value(self, deviceId, uid, toSet):
+        """Internal method to send a command to the API"""
+        for attr, value in self._devices[deviceId]["dataMap"].items():
+            if value.get("id") == uid:
+                message = {
+                    "deviceId": deviceId,
+                    "uid": attr,
+                    "value": self._get_param_value_id(value, toSet)
+                }
 
-    async def set_preset_mode(self, deviceId, preset: str):
-        """Internal method for setting the mode with a string value."""
-        if preset in COMMAND_MAP["climate_working_mode"]["values"]:
-            await self._set_value(
-                deviceId,
-                COMMAND_MAP["climate_working_mode"]["uid"],
-                COMMAND_MAP["climate_working_mode"]["values"][preset],
-            )
-
-    async def set_temperature(self, deviceId, setpoint):
-        """Public method for setting the temperature"""
-        set_temp = int(setpoint * 10)
-        await self._set_value(deviceId, COMMAND_MAP["setpoint"]["uid"], set_temp)
-
-    async def set_fan_speed(self, deviceId, fan: str):
-        """Public method to set the fan speed"""
-        config_fan_map = self._devices[str(deviceId)].get("config_fan_map")
-        map_fan_speed_to_int = {v: k for k, v in config_fan_map.items()}
-        await self._set_value(
-            deviceId, COMMAND_MAP["fan_speed"]["uid"], map_fan_speed_to_int[fan]
-        )
-
-    async def set_vertical_vane(self, deviceId, vane: str):
-        """Public method to set the vertical vane"""
-        await self._set_value(
-            deviceId, COMMAND_MAP["vvane"]["uid"], COMMAND_MAP["vvane"]["values"][vane]
-        )
-
-    async def set_horizontal_vane(self, deviceId, vane: str):
-        """Public method to set the horizontal vane"""
-        await self._set_value(
-            deviceId, COMMAND_MAP["hvane"]["uid"], COMMAND_MAP["hvane"]["values"][vane]
-        )
-
-    async def _set_value(self, deviceId, uid, value):
-        """Internal method to send a command to the API (and connect if necessary)"""
-        message = (
-            '{"command":"set","data":{"deviceId":%s,"uid":%i,"value":%i,"seqNo":0}}'
-            % (deviceId, uid, value)
-        )
-        self._sendQueue.put_nowait(message)
+                #message = (
+                #    '{"command":"set","data":{"deviceId":%s,"uid":%i,"value":%i,"seqNo":0}}'
+                #    % (deviceId, uid, value)
+                #)
+                self._sendQueue.put_nowait(message)
+                return
 
     def _update_device_state(self, deviceId, uid, value):
         """Internal method to update the state table of IntesisHome/Airconwithme devices"""
         deviceId = str(deviceId)
 
-        if uid in INTESIS_MAP:
+        if uid in self._devices[deviceId]["dataMap"]:
             # If the value is null (32768), set as None
             if value == INTESIS_NULL:
-                self._devices[deviceId][INTESIS_MAP[uid]["name"]] = None
+                self._devices[deviceId][self._devices[deviceId]["dataMap"][uid]["name"]] = None
             else:
                 # Translate known UIDs to configuration item names
-                value_map = INTESIS_MAP[uid].get("values")
+                value_map = self._devices[deviceId]["dataMap"][uid].get("values")
                 if value_map:
-                    self._devices[deviceId][INTESIS_MAP[uid]["name"]] = value_map.get(
+                    self._devices[deviceId][self._devices[deviceId]["dataMap"][uid]["id"]] = value_map.get(
                         value, value
                     )
                 else:
-                    self._devices[deviceId][INTESIS_MAP[uid]["name"]] = value
+                    self._devices[deviceId][self._devices[deviceId]["dataMap"][uid]["id"]] = value
         else:
             # Log unknown UIDs
             self._devices[deviceId][f"unknown_uid_{uid}"] = value
 
-    def _update_rssi(self, deviceId, rssi):
-        """Internal method to update the wireless signal strength."""
-        if rssi:
-            self._devices[str(deviceId)]["rssi"] = rssi
+    async def set_preset_mode(self, deviceId, preset: str):
+        """Internal method for setting the mode with a string value."""
+        #if preset in COMMAND_MAP["climate_working_mode"]["values"]:
+        #    await self._set_value(
+        #        deviceId,
+        #        COMMAND_MAP["climate_working_mode"]["uid"],
+        #        COMMAND_MAP["climate_working_mode"]["values"][preset],
+        #    )
+
+    def get_run_hours(self, deviceId) -> str:
+        """Public method returns the run hours of the IntesisHome controller."""
+        run_hours = self._get_param_options(deviceId, PARAM_WORKING_HOURS)
+        return run_hours
+
+    async def set_mode(self, deviceId, mode: str):
+        """Internal method for setting the mode with a string value."""
+        await self._set_value(deviceId,
+            PARAM_MODE,
+            mode
+        )
+
+    async def set_temperature(self, deviceId, setpoint):
+        """Public method for setting the temperature"""
+        set_temp = int(setpoint * 10)
+        await self._set_value(deviceId, PARAM_SETPOINT, set_temp)
+
+    async def set_fan_speed(self, deviceId, fan: str):
+        """Public method to set the fan speed"""
+        await self._set_value(
+            deviceId, PARAM_FAN_SPEED, fan
+        )
+
+    async def set_vertical_vane(self, deviceId, vane: str):
+        """Public method to set the vertical vane"""
+        #await self._set_value(
+        #    deviceId, COMMAND_MAP["vvane"]["uid"], COMMAND_MAP["vvane"]["values"][vane]
+        #)
+
+    async def set_horizontal_vane(self, deviceId, vane: str):
+        """Public method to set the horizontal vane"""
+       # await self._set_value(
+       #     deviceId, COMMAND_MAP["hvane"]["uid"], COMMAND_MAP["hvane"]["values"][vane]
+       # )
 
     async def set_mode_heat(self, deviceId):
         """Public method to set device to heat asynchronously."""
-        await self.set_mode(deviceId, "heat")
+        await self.set_mode(deviceId, "Heat")
 
     async def set_mode_cool(self, deviceId):
         """Public method to set device to cool asynchronously."""
-        await self.set_mode(deviceId, "cool")
+        await self.set_mode(deviceId, "Cool")
 
     async def set_mode_fan(self, deviceId):
         """Public method to set device to fan asynchronously."""
-        await self.set_mode(deviceId, "fan")
+        await self.set_mode(deviceId, "Fan")
 
     async def set_mode_auto(self, deviceId):
         """Public method to set device to auto asynchronously."""
-        await self.set_mode(deviceId, "auto")
+        await self.set_mode(deviceId, "Auto")
 
     async def set_mode_dry(self, deviceId):
         """Public method to set device to dry asynchronously."""
-        await self.set_mode(deviceId, "dry")
+        await self.set_mode(deviceId, "Dry")
 
     async def set_power_off(self, deviceId):
         """Public method to turn off the device asynchronously."""
         await self._set_value(
-            deviceId, COMMAND_MAP["power"]["uid"], COMMAND_MAP["power"]["values"]["off"]
+            deviceId, PARAM_POWER, "Off"
         )
 
     async def set_power_on(self, deviceId):
         """Public method to turn on the device asynchronously."""
         await self._set_value(
-            deviceId, COMMAND_MAP["power"]["uid"], COMMAND_MAP["power"]["values"]["on"]
+            deviceId, PARAM_POWER, "On"
         )
 
     def get_mode(self, deviceId) -> str:
         """Public method returns the current mode of operation."""
-        if "mode" in self._devices[str(deviceId)]:
-            return self._devices[str(deviceId)]["mode"]
-        elif "operating_mode" in self._devices[str(deviceId)]:
-            return self._devices[str(deviceId)]["operating_mode"]
+        return self._get_param_value(deviceId, PARAM_MODE)
 
     def get_mode_list(self, deviceId) -> list:
         """Public method to return the list of device modes."""
-        mode_list = list()
-        config_mode_map = self._devices[str(deviceId)].get("config_mode_map")
-        for mode_bit in MODE_BITS.keys():
-            if config_mode_map & mode_bit:
-                mode_list.append(MODE_BITS.get(mode_bit))
-        return mode_list
+        return self._get_param_options(deviceId, PARAM_MODE)
 
     def get_fan_speed(self, deviceId):
         """Public method returns the current fan speed."""
-        config_fan_map = self._devices[str(deviceId)].get("config_fan_map")
-
-        if "fan_speed" in self._devices[str(deviceId)] and config_fan_map:
-            fan_speed_int = self._devices[str(deviceId)].get("fan_speed")
-            return config_fan_map.get(fan_speed_int)
-        else:
-            return None
+        return self._get_param_value(deviceId, PARAM_FAN_SPEED)
 
     def get_fan_speed_list(self, deviceId):
         """Public method to return the list of possible fan speeds."""
-        config_fan_map = self._devices[str(deviceId)].get("config_fan_map")
-        if config_fan_map:
-            return list(config_fan_map.values())
-        else:
-            return None
+        return self._get_param_options(deviceId, PARAM_FAN_SPEED) #todo : check config
 
     def get_device_name(self, deviceId) -> str:
         return self._devices[str(deviceId)].get("name")
 
     def get_power_state(self, deviceId) -> str:
         """Public method returns the current power state."""
-        return self._devices[str(deviceId)].get("power")
+        return self._get_param_value(deviceId, PARAM_POWER)
 
     def get_instant_power_consumption(self, deviceId) -> int:
         """Public method returns the current power state."""
-        instant_power = self._devices[str(deviceId)].get("instant_power_consumption")
+        instant_power = self._get_param_value(deviceId, PARAM_POWER_CONSUMPTION)
         if instant_power:
             return int(instant_power)
 
     def get_total_power_consumption(self, deviceId) -> int:
         """Public method returns the current power state."""
-        accumulated_power = self._devices[str(deviceId)].get(
-            "accumulated_power_consumption"
-        )
+        accumulated_power = self._get_param_value(deviceId, PARAM_ACC_POWER_CONSUMPTION)
         if accumulated_power:
             return int(accumulated_power)
 
     def get_cool_power_consumption(self, deviceId) -> int:
         """Public method returns the current power state."""
-        aquarea_cool = self._devices[str(deviceId)].get("aquarea_cool_consumption")
+        aquarea_cool = self._get_param_value(deviceId, "aquarea_cool_consumption") #todo
         if aquarea_cool:
             return int(aquarea_cool)
 
     def get_heat_power_consumption(self, deviceId) -> int:
         """Public method returns the current power state."""
-        aquarea_heat = self._devices[str(deviceId)].get("aquarea_heat_consumption")
+        aquarea_heat = self._get_param_value(deviceId, "aquarea_heat_consumption") #todo
         if aquarea_heat:
             return int(aquarea_heat)
 
     def get_tank_power_consumption(self, deviceId) -> int:
         """Public method returns the current power state."""
-        aquarea_tank = self._devices[str(deviceId)].get("aquarea_tank_consumption")
+        aquarea_tank = self._get_param_value(deviceId, "aquarea_tank_consumption") #todo
         if aquarea_tank:
             return int(aquarea_tank)
 
     def get_preset_mode(self, deviceId) -> str:
-        return self._devices[str(deviceId)].get("climate_working_mode")
+        return self._get_param_value(deviceId, "climate_working_mode") #todo
 
     def is_on(self, deviceId) -> bool:
         """Return true if the controlled device is turned on"""
-        return self._devices[str(deviceId)].get("power") == "on"
+        return self._get_param_value(deviceId, PARAM_POWER) == "On"
 
     def has_vertical_swing(self, deviceId) -> bool:
-        vvane_config = self._devices[str(deviceId)].get("config_vertical_vanes")
+        vvane_config = self._get_param_value(deviceId, "config_vertical_vanes") #Vane Up/Down Position
         return vvane_config and vvane_config > 1024
 
     def has_horizontal_swing(self, deviceId) -> bool:
-        hvane_config = self._devices[str(deviceId)].get("config_horizontal_vanes")
+        hvane_config = self._get_param_value(deviceId, "config_horizontal_vanes") #todo
         return hvane_config and hvane_config > 1024
 
     def has_setpoint_control(self, deviceId) -> bool:
-        return "setpoint" in self._devices[str(deviceId)]
+        return self._has_feature(deviceId, PARAM_SETPOINT)
 
     def get_setpoint(self, deviceId) -> float:
         """Public method returns the target temperature."""
-        setpoint = self._devices[str(deviceId)].get("setpoint")
+        setpoint = self._get_param_value(deviceId, PARAM_SETPOINT)
         if setpoint:
             setpoint = int(setpoint) / 10
         return setpoint
 
     def get_temperature(self, deviceId) -> float:
         """Public method returns the current temperature."""
-        temperature = self._devices[str(deviceId)].get("temperature")
+        temperature = self._get_param_value(deviceId, PARAM_TEMPERATURE)
         if temperature:
             temperature = int(temperature) / 10
         return temperature
 
     def get_outdoor_temperature(self, deviceId) -> float:
         """Public method returns the current temperature."""
-        outdoor_temp = self._devices[str(deviceId)].get("outdoor_temp")
+        outdoor_temp = self._get_param_value(deviceId, PARAM_OUTDOOR_TEMP)
         if outdoor_temp:
             outdoor_temp = int(outdoor_temp) / 10
         return outdoor_temp
 
     def get_max_setpoint(self, deviceId) -> float:
         """Public method returns the current maximum target temperature."""
-        temperature = self._devices[str(deviceId)].get("setpoint_max")
+        temperature = self._get_param_value(deviceId, PARAM_SETPOINT_MAX)
         if temperature:
             temperature = int(temperature) / 10
         return temperature
 
     def get_min_setpoint(self, deviceId) -> float:
         """Public method returns the current minimum target temperature."""
-        temperature = self._devices[str(deviceId)].get("setpoint_min")
+        temperature = self._get_param_value(deviceId, PARAM_SETPOINT_MIN)
         if temperature:
             temperature = int(temperature) / 10
         return temperature
 
     def get_rssi(self, deviceId) -> str:
         """Public method returns the current wireless signal strength."""
-        rssi = self._devices[str(deviceId)].get("rssi")
+        rssi = self._get_param_value(deviceId, "rssi")
         return rssi
 
     def get_vertical_swing(self, deviceId) -> str:
         """Public method returns the current vertical vane setting."""
-        swing = self._devices[str(deviceId)].get("vvane")
+        swing = self._get_param_value(deviceId, "vvane") #todo
         return swing
 
     def get_horizontal_swing(self, deviceId) -> str:
         """Public method returns the current horizontal vane setting."""
-        swing = self._devices[str(deviceId)].get("hvane")
+        swing = self._get_param_value(deviceId, "hvane") #todo
         return swing
 
     async def _send_update_callback(self, deviceId=None):
